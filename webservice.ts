@@ -1,60 +1,53 @@
 import { Injectable } from '@angular/core';
-import { Subject } from 'rxjs';
-import { webSocket, WebSocketSubject } from 'rxjs/webSocket';
-import { TokenService } from './token.service';
 import { environment } from 'src/environments/environment';
+import { TokenService } from 'src/app/services/token.service';
 
 @Injectable({
   providedIn: 'root'
 })
-export class WebsocketService {
-  private ws: WebSocketSubject<any>;
-  public messages$: Subject<unknown> = new Subject<unknown>();
-  public status$: Subject<boolean> = new Subject<boolean>();
+export class WebSocketService {
+  private websocket: WebSocket;
 
-  constructor(private tokenService: TokenService) {}
 
+  constructor(
+    private tokenService: TokenService){}
   public connect(): void {
-    this.create();
+    let token = this.tokenService.getToken();
+    const url = environment.websocket_url + 'ws'; 
+    const protocolHeader = token.access_token;
+    console.log("protocolHeader:",protocolHeader)
+    this.websocket = new WebSocket(url,protocolHeader);
+
+    this.websocket.onopen = () => {
+      console.log('WebSocket connection opened');
+    };
+
+    this.websocket.onmessage = (event) => {
+      console.log('Received message: ', event.data);
+    };
+
+    this.websocket.onerror = (error) => {
+      console.error('WebSocket error: ', error);
+    };
+
+    this.websocket.onclose = () => {
+      console.log('WebSocket connection closed');
+    };
   }
 
-  private create() {
-    if (this.ws) {
-      this.ws.complete();
-    }
-
-    const token = this.tokenService.getToken();
-    const WS_ENDPOINT = environment.websocket_url +'ws';
-    // Create a new WebSocket connection
-    this.ws = webSocket({
-      url: WS_ENDPOINT,
-      protocol: token.id_token, 
-      openObserver: {
-        next: () => {
-          this.status$.next(true);
-        }
-      },
-      closeObserver: {
-        next: () => {
-          this.status$.next(false);
-        }
-      }
-    });
-
-    this.ws.subscribe(
-      message => this.messages$.next(message),
-      err => console.error('WebSocket error', err),
-      () => console.log('WebSocket connection closed')
-    );
-  }
-
-  close() {
-    if (this.ws) {
-      this.ws.complete();
+  public send(data: ArrayBuffer): void {
+    if (this.websocket.readyState === WebSocket.OPEN) {
+      this.websocket.send(data);
     }
   }
 
-  sendMessage(message: any) {
-    this.ws.next(message);
+  public close(): void {
+    if (this.websocket.readyState === WebSocket.OPEN) {
+      this.websocket.close();
+    }
+  }
+
+  public setOnMessageHandler(handler: (event: MessageEvent) => void): void {
+    this.websocket.onmessage = handler;
   }
 }
