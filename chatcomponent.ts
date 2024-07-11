@@ -6,7 +6,7 @@ import { blobToSrc, showErrors } from 'src/app/utils';
 import {FormBuilder, Validators} from "@angular/forms"
 import { ChatService } from 'src/app/services/chat.service';
 import { FileService } from 'src/app/services/file.service';
-import { WebsocketService } from 'src/app/services/websocket.service';
+import { WebSocketService } from 'src/app/services/websocket.service';
 import * as RecordRTC from 'recordrtc';
 
 @Component({
@@ -58,7 +58,7 @@ export class ChatComponent implements OnInit {
     private formBuilder:FormBuilder,
     private chatService:ChatService,
     private fileService:FileService,
-    private websocketService: WebsocketService
+    private websocketService:WebSocketService
   ) { }
 
   chat_text = " ";
@@ -77,35 +77,33 @@ export class ChatComponent implements OnInit {
     } else {
       console.error('RecordRTC is not available');
     }
-  
+  }
 
-  // Subscribe to WebSocket messages
-  this.websocketService.messages$.subscribe((message: any) => {
-    console.log("Received transcription:", message);
-    this.chat_text += message;
-    this.chat_form.controls['prompt'].setValue(this.chat_text);
-  });
-
-  // Subscribe to WebSocket status
-  this.websocketService.status$.subscribe((status: boolean) => {
-    if (!status){
-      console.log("WebSocket connection closed")
-    } else{
-      console.log("WebSocket connection opened")
-    }
-
-  });
-}
-
-  
   // Method to start recording audio
   async initiateRecording() {
     console.log('Starting recording...');
     this.websocketService.connect();
 
+    this.websocketService.setOnMessageHandler((event) => {
+      console.log('Received transcription: ', event.data);
+      this.chat_text += event.data;
+      this.chat_form.controls['prompt'].setValue(this.chat_text);
+    });
+
     try {
       this.mediaStream = await navigator.mediaDevices.getUserMedia({ audio: true }); // Get user media
+      const desiredSampRate = 16000;
+      const numberOfAudioChannels = 1;
+      const chunkDurationMs = 200;
 
+      const bytesPerSample = 2;
+      let chunkSizeBytes = chunkDurationMs / 1000 * desiredSampRate * bytesPerSample;
+
+      if (numberOfAudioChannels == 1){
+        chunkSizeBytes = Math.ceil(chunkSizeBytes/2) * 2;
+      }else{
+        chunkSizeBytes = Math.ceil(chunkSizeBytes/4) * 4;
+      }
       // Check if RecordRTC and StereoAudioRecorder are defined
       if (typeof RecordRTC === 'undefined' || typeof RecordRTC.StereoAudioRecorder === 'undefined') {
         console.error('RecordRTC or StereoAudioRecorder is not defined.');
@@ -116,14 +114,32 @@ export class ChatComponent implements OnInit {
         type: 'audio',
         mimeType: 'audio/pcm', // Ensure PCM encoding
         recorderType: RecordRTC.StereoAudioRecorder,
-        desiredSampRate: 16000,
-        numberOfAudioChannels: 1,
-        timeSlice: 200, // Chunk size in milliseconds (200ms for 16000 Hz)
+        desiredSampRate: desiredSampRate,
+        numberOfAudioChannels: numberOfAudioChannels,
+        timeSlice: chunkDurationMs, // Chunk size in milliseconds (200ms for 16000 Hz)
         ondataavailable: (blob: Blob) => {
           console.log('Sending audio data of size: ', blob.size, ' bytes');
           blob.arrayBuffer().then(buffer => {
-            this.websocketService.sendMessage(buffer);
-          });
+            let uint8Array = new Uint8Array(buffer);
+
+                // Check if the buffer contains only silence
+                let isSilence = true;
+                for (let i = 0; i < uint8Array.length; i++) {
+                    if (uint8Array[i] !== 0) {
+                        isSilence = false;
+                        break;
+                    }
+                }
+
+                if (isSilence) {
+                    // Create a buffer of zero bytes to send as silence
+                    uint8Array = new Uint8Array(chunkSizeBytes);
+                }
+
+                
+                this.websocketService.send(uint8Array.buffer);
+                
+            });
         }
       });
 
@@ -153,7 +169,8 @@ export class ChatComponent implements OnInit {
       console.error('Recorder is not properly initialized.');
     }
 
-    this.websocketService.close();
+    
+    this.websocketService.close(); 
 
     if (this.mediaStream) {
       this.mediaStream.getTracks().forEach(track => track.stop()); // Stop all media tracks
