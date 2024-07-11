@@ -44,9 +44,9 @@ class MyEventHandler(TranscriptResultStreamHandler):
 
 @router.websocket("/ws")
 async def websocket_endpoint(websocket: WebSocket):
-    # user = await get_current_user_ws(websocket)
-    # if not user:
-    #     return JSONResponse(status_code=403, content={"message":"Unauthorized"})
+    user = await get_current_user_ws(websocket)
+    if not user:
+        return JSONResponse(status_code=403, content={"message":"Unauthorized"})
     print("headers:",websocket.headers)
     await websocket.accept()
     logger.info("WebSocket connection accepted")
@@ -69,7 +69,6 @@ async def websocket_endpoint(websocket: WebSocket):
 
 async def receive_audio(websocket: WebSocket, stream):
     while True:
-        await websocket.receive()
         data = await websocket.receive_bytes()
         if data:
             logger.info(f"Received audio data of size: {len(data)} bytes")
