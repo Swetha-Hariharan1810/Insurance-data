@@ -1,0 +1,13 @@
+Key Workflow:
+Get Possible Edges and to_node Texts:
+
+Retrieve all possible edges for the current node and fetch the to_node texts corresponding to the edges.
+LLM to Generate Options or Actions:
+
+Use the to_node texts to let the LLM generate possible options or actions for the user.
+Match the Transcript with Edge Criteria:
+
+Use the LLM to match the transcript segment with the edge criteria or generated options.
+Transition to the Next Node:
+
+If a matching edge is found, transition to the corresponding to_nodeid.
