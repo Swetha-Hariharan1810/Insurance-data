@@ -11,3 +11,24 @@ Use the LLM to match the transcript segment with the edge criteria or generated 
 Transition to the Next Node:
 
 If a matching edge is found, transition to the corresponding to_nodeid.
+
+
+
+Get Possible Edges and to_node Texts:
+
+Retrieves possible edges for the current node and fetches the to_node_text for each edge.
+LLM Generates Options:
+
+Based on the to_node texts, the LLM generates actionable options or next steps for the user.
+LLM Matches Transcript:
+
+The transcript segment is matched to the edge criteria using an LLM, which determines the best edge for transition.
+Transition to the Next Node:
+
+If a match is found, the current node transitions to the next node (to_nodeid). Otherwise, the system waits for more transcript context.
+This code provides options for next actions while maintaining flexibility to determine the next node based on transcript input.
+
+
+
+
+
